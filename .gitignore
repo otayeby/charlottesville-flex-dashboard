@@ -3,3 +3,4 @@ Icon
 data/Icon
 *.RData
 data/
+.Rproj.user
