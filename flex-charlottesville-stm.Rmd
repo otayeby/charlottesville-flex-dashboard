@@ -1,40 +1,48 @@
 ---
-title: "Charlotte Protest Topics"
+title: "Charlottesville Twitter Data"
 output: 
   flexdashboard::flex_dashboard:
-    orientation: columns
+    orientation: rows
     vertical_layout: fill
+    source_code: embed
 runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
 # Load libraries needed
-library(flexdashboard); library(tidyverse); library(plotly); library(stm); library(scales); library(shinyWidgets);
-# Load the input file
+library(flexdashboard); 
+library(tidyverse); 
+library(plotly); 
+library(stm); 
+library(scales);
+library(shinyWidgets);
+library(visNetwork);
+library(igraph)
+
+# Load the input file (see .R file)
 load(file = "tweet_topic_df.RData")
+load(file = "topicDF.RData")
+load(file = "network.RData")
+
 # Convert IDs to numeric
-tweet_topic_df$id <- as.numeric(tweet_topic_df$id)
-# Get the topic names in an array
-topicsNames <- tail(colnames(tweet_topic_df), 40)
-#tweet_topic_df$id[0]
+df$id <- as.numeric(df$id)
 ```
 
-### Inputs
+Inputs {.sidebar}
+-------------------------------------
 
 ```{r}
 # Set input for the topic
-selectInput("topicNum", label = "1st Topic", #multiple = TRUE,
-    choices = topicsNames,
-    selected = c("release + wife + video + released + releases"))
+selectInput("topicNum", label = "1st Topic", choices = topicDF$Prob)
 # Set input for the x-range
 sliderInput("xaxis", label = "X Range",
-            min = 0, max = 1, value = 0.2, step = 0.05)
+            min = 0, max = 1, value = c(0, 0.2), step = 0.05)
 # Set input for the y-range
 sliderInput("yaxis", label = "Y Range",
-            min = 0, max = 300, value = 120, step = 0.05)
+            min = 0, max = 150, value = 100, step = 0.05)
 # Set input for the adjustment
 sliderInput("adjust", label = "Adjustment",
-            min = 0, max = 20, value = 3, step = 0.5)
+            min = 0, max = 3, value = 1, step = 0.1)
 # Set input for the bin width
 #sliderInput("histogramBin", label = "Histogram Bin",
 #            min = 0, max = 0.1, value = 0.01, step = 0.001)
@@ -42,42 +50,67 @@ sliderInput("adjust", label = "Adjustment",
 # switchInput(inputId = "Histogram", value = TRUE, width = '500px')
 ```
 
+Row {.tabset .tabset-fade}
+-------------------------------------
+    
+### Density Plot
+
 ```{r}
 # Call renderPlotly
 renderPlotly({
-  # Select the column which correspond to the topic choice
-  #selected_topic <- input$topicNum
-  #t <- tweet_topic_df[topicsNames[input$topicNum]]
+  name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
   # Construct the ggplot for that topic using Gaussian as the kernel density
-  g <- ggplot(tweet_topic_df, aes(x = input$topicNum)) +
-  #g <- ggplot(t, aes(x = input$topicNum)) +
-  geom_density(kernel = "gaussian", adjust = input$adjust) +
-  theme(legend.position = c(0.5,0.75)) +
-  xlim(0,input$xaxis) +
-  ylim(0,input$yaxis)
+  g <- df %>%
+    select(name, hotIssue) %>%
+    gather("topic", "Probability", name) %>% # gather (see tidyr package), creating a new variable value
+    ggplot(aes(x = Probability, color = hotIssue)) +
+    geom_density(kernel = "gaussian", adjust = input$adjust) +
+    theme(legend.position = "none") +
+    xlim(input$xaxis[1],input$xaxis[2]) +
+    ylim(0,input$yaxis)
   # Use ggplotly to plot the ggplot
   ggplotly(g, tooltip = c("y","x","colour"))
 })
 ```
 
-<!-- ### DataTable -->
+### Selected Tweets
 
-<!-- ```{r} -->
-<!-- #https://plot.ly/r/shiny-coupled-events/ -->
-<!-- # Call renderDataTable from DT library -->
-<!-- DT::renderDataTable({ -->
-<!--   # Set the event listener -->
-<!--   event.data <- event_data("plotly_relayout") -->
-<!--   # Set the max and min according to the event -->
-<!--   min <- event.data$`xaxis.range[0]` -->
-<!--   max <- event.data$`xaxis.range[1]` -->
-<!--   # Get the row numbers -->
-<!--   row <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min] -->
-<!--   # Select the rows in tweet_id_body and make a tibble out of it -->
-<!--   t <- tibble(tweet = tweet_id_body$body[row],  -->
-<!--               ScreenName = tweet_id_body$screenName[row],  -->
-<!--               Probability = round(tweet_id_body[row,input$topicNum], 3)) -->
-<!--   # Create a datatable from the   -->
-<!--   DT::datatable(t, options = list(pageLength = 7, dom = 'tip'), rownames = FALSE) -->
-<!-- }) -->
-<!-- ``` -->
+```{r}
+#https://plot.ly/r/shiny-coupled-events/
+# Call renderDataTable from DT library
+DT::renderDataTable({
+  # Set the event listener
+  event.data <- event_data("plotly_relayout")
+  # Set the max and min according to the event
+  min <- event.data$`xaxis.range[0]`
+  max <- event.data$`xaxis.range[1]`
+
+  name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
+  
+  t <- df %>%
+    select(name, screenName, body, postedTime, hotIssue, local) %>%
+    gather("topic", "Probability", name) %>%
+    filter(Probability < max & Probability > min) %>%
+    select(-topic) %>%
+    mutate(Probability = round(Probability, 5)) %>%
+    arrange(desc(Probability))
+
+  DT::datatable(t, 
+                filter = 'top', 
+                extensions = 'Buttons',
+                options = list(pageLength = 8, 
+                               buttons = c('copy', 'csv', 'excel', 'pdf'),
+                               dom = 'Bfrtip'), 
+                rownames = FALSE)
+})
+```
+
+### Topic Overview
+
+```{r}
+renderVisNetwork({
+  visNetwork(net[[1]], net[[2]], width="100%",  height="600px", main=" ") %>%   
+    visOptions(highlightNearest = list(enabled = TRUE, algorithm = "hierarchical")) %>%
+    visInteraction(navigationButtons = TRUE) 
+})
+```
