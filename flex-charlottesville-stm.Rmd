@@ -1,0 +1,101 @@
+---
+title: "Charlotte Protest Topics"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny    
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard); 
+library(tidyverse); 
+library(plotly); 
+library(stm); 
+library(scales)
+
+load(file = "ctmFitNoHashtagsHotIssueLocal.RData")
+load(file = "allDocs1.RData")
+
+# sageLabels: Displays Verbose Labels That Describe Topics And Topic-Covariate Groups In Depth
+# change labels$marginal$prob for raw probabilities
+labels <- sageLabels(ctmFitNoHashtags40, n = 5)
+
+#allDocs1$tweetId <- as.character(allDocs1$tweetId)
+#out$meta$id <- as.character(out$meta$id)
+# <- allDocs1[allDocs1$tweetId %in% out$meta$id,body]
+
+# ctmFitNoHashtags40
+topicsNames <- sapply(1:40, function(x) paste0(labels$marginal$frex[x,], collapse = " + "))
+
+# Get the document-topic matrix Theta as a dataframe
+df <- as.data.frame(ctmFitNoHashtags40$theta)
+# Get topic names
+colnames(df) <- topicsNames
+# Define the rows as an array of numbers from 1 till the total number of documents
+df$row <- 1:433274
+# 
+df$pLocation <- out$meta$local
+df$id <- out$meta$id
+df$hotIssue <- out$meta$hotIssue
+df$time <- out$meta$Time
+#df2 <- gather(df, key = "Topic")
+df2 <- gather(df, key = "topic", value = "Probability")
+#colnames(df2) <- c("Location","Topic","Probability")
+#df2$Probability <- as.numeric(df2$Probability)
+```
+
+Inputs {.sidebar}
+-------------------------------------
+
+```{r}
+selectInput("topicNum", label = "1st Topic", #multiple = TRUE,
+    choices = topicsNames,
+    selected = c("release + wife + video + released + releases"))
+sliderInput("xaxis", label = "X Range",
+            min = 0, max = 1, value = 0.2, step = 0.05)
+sliderInput("yaxis", label = "Y Range",
+            min = 0, max = 100, value = 30, step = 0.05)
+sliderInput("adjust", label = "Adjustment",
+            min = 0, max = 20, value = 3, step = 0.5)
+#sliderInput("histogramBin", label = "Histogram Bin",
+#            min = 0, max = 0.1, value = 0.01, step = 0.001)
+```
+
+Column
+-------------------------------------
+    
+### Density Plot
+    
+```{r}
+renderPlotly({
+  t <- filter(df2, topic %in% c(input$topicNum))
+
+  g <- ggplot(t, aes(x = Probability)) +
+    geom_density( kernel = "gaussian", adjust = input$adjust) +
+    theme(legend.position = c(0.5,0.75)) +
+    xlim(0,input$xaxis)
+    #ylim(0,input$yaxis)
+  
+  ggplotly(g, tooltip = c("y","x","colour"))
+})
+
+```
+
+### Chart 2
+
+```{r}
+#https://plot.ly/r/shiny-coupled-events/
+
+DT::renderDataTable({
+  event.data <- event_data("plotly_relayout")
+  min <- event.data$`xaxis.range[0]`
+  max <- event.data$`xaxis.range[1]`
+  
+  row <- df$row[df[,c(input$topicNum)]< max & 
+                                  df[,c(input$topicNum)]> min]
+  #t <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min]
+  t2 <- tibble(id = df$id[row], Probability = df[row,input$topicNum])
+  DT::datatable(t2, rownames = FALSE)
+})
+```
