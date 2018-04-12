@@ -4,110 +4,80 @@ output:
   flexdashboard::flex_dashboard:
     orientation: columns
     vertical_layout: fill
-runtime: shiny    
+runtime: shiny
 ---
 
 ```{r setup, include=FALSE}
-library(flexdashboard); 
-library(tidyverse); 
-library(plotly); 
-library(stm); 
-library(scales)
-
-load(file = "ctmFitNoHashtagsHotIssueLocal.RData")
-load("/Volumes/GoogleDrive/My Drive/Live/TRISP/analysis/Charlottesville/allDocs1.RData")
-
-# sageLabels: Displays Verbose Labels That Describe Topics And Topic-Covariate Groups In Depth
-# change labels$marginal$prob for raw probabilities
-labels <- sageLabels(ctmFitNoHashtags40, n = 5)
-
-# Convert the tweetId in allDocs1 and id in out$meta to string
-# allDocs1$tweetId <- as.character(allDocs1$tweetId)
-# out$meta$id <- as.character(out$meta$id)
-# <- allDocs1[allDocs1$tweetId %in% out$meta$id,body]
-
-# ctmFitNoHashtags40
-topicsNames <- sapply(1:40, function(x) paste0(labels$marginal$frex[x,], collapse = " + "))
-
-# Get the document-topic matrix Theta as a dataframe
-df <- as.data.frame(ctmFitNoHashtags40$theta)
-# Get topic names
-colnames(df) <- topicsNames
-# Define the rows as an array of numbers from 1 till the total number of documents
-df$row <- 1:433274
-df$pLocation <- out$meta$local
-df$id <- out$meta$id
-df$hotIssue <- out$meta$hotIssue
-df$time <- out$meta$Time
-
-# Save the tweetIds and boy from the allDocs in a separate variable
-tweet_id_body <- allDocs1[c("tweetId", "body")]
-# Rename the columns
-names(tweet_id_body) <- c("id", "body")
-# Merge the df and tweet_id_body by id and save it into df
-tweet_id_body <- merge(tweet_id_body, df, by="id")
-#df$id <- as.numeric(df$id)
-
-#df2 <- gather(df, key = "Topic")
-df2 <- gather(df, key = "topic", value = "Probability")
-#colnames(df2) <- c("Location","Topic","Probability")
-#df2$Probability <- as.numeric(df2$Probability)
+# Load libraries needed
+library(flexdashboard); library(tidyverse); library(plotly); library(stm); library(scales); library(shinyWidgets);
+# Load the input file
+load(file = "tweet_topic_df.RData")
+# Convert IDs to numeric
+tweet_topic_df$id <- as.numeric(tweet_topic_df$id)
+# Get the topic names in an array
+topicsNames <- tail(colnames(tweet_topic_df), 40)
+#tweet_topic_df$id[0]
 ```
 
-Inputs {.sidebar}
--------------------------------------
+### Inputs
 
 ```{r}
+# Set input for the topic
 selectInput("topicNum", label = "1st Topic", #multiple = TRUE,
     choices = topicsNames,
     selected = c("release + wife + video + released + releases"))
+# Set input for the x-range
 sliderInput("xaxis", label = "X Range",
             min = 0, max = 1, value = 0.2, step = 0.05)
+# Set input for the y-range
 sliderInput("yaxis", label = "Y Range",
-            min = 0, max = 100, value = 30, step = 0.05)
+            min = 0, max = 300, value = 120, step = 0.05)
+# Set input for the adjustment
 sliderInput("adjust", label = "Adjustment",
             min = 0, max = 20, value = 3, step = 0.5)
+# Set input for the bin width
 #sliderInput("histogramBin", label = "Histogram Bin",
 #            min = 0, max = 0.1, value = 0.01, step = 0.001)
+# Set input for choosing the graph type: histogram or density
+# switchInput(inputId = "Histogram", value = TRUE, width = '500px')
 ```
 
-Column
--------------------------------------
-    
-### Density Plot
-    
 ```{r}
+# Call renderPlotly
 renderPlotly({
-  t <- filter(df2, topic %in% c(input$topicNum))
-
-  g <- ggplot(t, aes(x = Probability)) +
-    geom_density( kernel = "gaussian", adjust = input$adjust) +
-    theme(legend.position = c(0.5,0.75)) +
-    xlim(0,input$xaxis)
-    #ylim(0,input$yaxis)
-  
+  # Select the column which correspond to the topic choice
+  #selected_topic <- input$topicNum
+  #t <- tweet_topic_df[topicsNames[input$topicNum]]
+  # Construct the ggplot for that topic using Gaussian as the kernel density
+  g <- ggplot(tweet_topic_df, aes(x = input$topicNum)) +
+  #g <- ggplot(t, aes(x = input$topicNum)) +
+  geom_density(kernel = "gaussian", adjust = input$adjust) +
+  theme(legend.position = c(0.5,0.75)) +
+  xlim(0,input$xaxis) +
+  ylim(0,input$yaxis)
+  # Use ggplotly to plot the ggplot
   ggplotly(g, tooltip = c("y","x","colour"))
 })
-
 ```
 
-### Chart 2
+<!-- ### DataTable -->
 
-```{r}
-#https://plot.ly/r/shiny-coupled-events/
-
-DT::renderDataTable({
-  event.data <- event_data("plotly_relayout")
-  min <- event.data$`xaxis.range[0]`
-  max <- event.data$`xaxis.range[1]`
-  
-  row <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min]
-  #selected_ids <- as.character(df$id[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min])
-
-  #t <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min]
-  #t2 <- tibble(id = df$id[row], Probability = df[row,input$topicNum])
-  #t2 <- tibble(body = df$body[row,input$topicNum], Probability = df[row,input$topicNum])
-  t2 <- tibble(id = tweet_id_body$body[row], Probability = tweet_id_body[row,input$topicNum])
-  DT::datatable(t2, rownames = FALSE)
-})
-```
+<!-- ```{r} -->
+<!-- #https://plot.ly/r/shiny-coupled-events/ -->
+<!-- # Call renderDataTable from DT library -->
+<!-- DT::renderDataTable({ -->
+<!--   # Set the event listener -->
+<!--   event.data <- event_data("plotly_relayout") -->
+<!--   # Set the max and min according to the event -->
+<!--   min <- event.data$`xaxis.range[0]` -->
+<!--   max <- event.data$`xaxis.range[1]` -->
+<!--   # Get the row numbers -->
+<!--   row <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min] -->
+<!--   # Select the rows in tweet_id_body and make a tibble out of it -->
+<!--   t <- tibble(tweet = tweet_id_body$body[row],  -->
+<!--               ScreenName = tweet_id_body$screenName[row],  -->
+<!--               Probability = round(tweet_id_body[row,input$topicNum], 3)) -->
+<!--   # Create a datatable from the   -->
+<!--   DT::datatable(t, options = list(pageLength = 7, dom = 'tip'), rownames = FALSE) -->
+<!-- }) -->
+<!-- ``` -->
