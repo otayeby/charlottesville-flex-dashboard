@@ -1,2 +1,5 @@
 
 Icon
+data/Icon
+*.RData
+data/
