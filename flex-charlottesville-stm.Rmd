@@ -20,9 +20,9 @@ library(visNetwork);
 library(igraph)
 
 # Load the input file (see .R file)
-load(file = "tweet_topic_df.RData")
-load(file = "topicDF.RData")
-load(file = "network.RData")
+load(file = "data/tweet_topic_df.RData")
+load(file = "data/topicDF.RData")
+load(file = "data/network.RData")
 
 # Convert IDs to numeric
 df$id <- as.numeric(df$id)
