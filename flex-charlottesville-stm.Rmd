@@ -22,8 +22,8 @@ load("/Volumes/GoogleDrive/My Drive/Live/TRISP/analysis/Charlottesville/allDocs1
 labels <- sageLabels(ctmFitNoHashtags40, n = 5)
 
 # Convert the tweetId in allDocs1 and id in out$meta to string
-allDocs1$tweetId <- as.character(allDocs1$tweetId)
-out$meta$id <- as.character(out$meta$id)
+# allDocs1$tweetId <- as.character(allDocs1$tweetId)
+# out$meta$id <- as.character(out$meta$id)
 # <- allDocs1[allDocs1$tweetId %in% out$meta$id,body]
 
 # ctmFitNoHashtags40
@@ -45,7 +45,8 @@ tweet_id_body <- allDocs1[c("tweetId", "body")]
 # Rename the columns
 names(tweet_id_body) <- c("id", "body")
 # Merge the df and tweet_id_body by id and save it into df
-# df <- merge(tweet_id_body, df, by="id")
+tweet_id_body <- merge(tweet_id_body, df, by="id")
+#df$id <- as.numeric(df$id)
 
 #df2 <- gather(df, key = "Topic")
 df2 <- gather(df, key = "topic", value = "Probability")
@@ -100,11 +101,13 @@ DT::renderDataTable({
   min <- event.data$`xaxis.range[0]`
   max <- event.data$`xaxis.range[1]`
   
-  row <- df$row[df[,c(input$topicNum)]< max & 
-                                  df[,c(input$topicNum)]> min]
+  row <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min]
+  #selected_ids <- as.character(df$id[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min])
+
   #t <- df$row[df[,c(input$topicNum)]< max & df[,c(input$topicNum)]> min]
-  t2 <- tibble(id = df$id[row], Probability = df[row,input$topicNum])
-  #t2 <- tibble(body = df$body[row], Probability = df[row,input$topicNum])
+  #t2 <- tibble(id = df$id[row], Probability = df[row,input$topicNum])
+  #t2 <- tibble(body = df$body[row,input$topicNum], Probability = df[row,input$topicNum])
+  t2 <- tibble(id = tweet_id_body$body[row], Probability = tweet_id_body[row,input$topicNum])
   DT::datatable(t2, rownames = FALSE)
 })
 ```
