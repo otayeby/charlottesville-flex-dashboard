@@ -61,9 +61,13 @@ renderPlotly({
   name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
   # Construct the ggplot for that topic using Gaussian as the kernel density
   g <- df %>%
+    # Select the columns VX (X: topic number) and hotIssue from the df
     select(name, hotIssue) %>%
-    gather("topic", "Probability", name) %>% # gather (see tidyr package), creating a new variable value
+    # Spread the selected the rows by the "topic", "Probability", name (which is the topic number VX)
+    gather("topic", "Probability", name) %>%
+    # Create a gglplot where the aesthetic is the Probability and the color is the hotIssue
     ggplot(aes(x = Probability, color = hotIssue)) +
+    # Make hte ggplot a gaussian kernel density function with an adjustment
     geom_density(kernel = "gaussian", adjust = input$adjust) +
     theme(legend.position = "none") +
     xlim(input$xaxis[1],input$xaxis[2]) +
@@ -85,22 +89,38 @@ DT::renderDataTable({
   min <- event.data$`xaxis.range[0]`
   max <- event.data$`xaxis.range[1]`
 
+  # Get the column name of the probabilities displayed
   name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
   
+  # Pass the df to a pipeline
   t <- df %>%
+    # Select the columns name (which is actually VX), screenName, body, postedTime, hostIssue, local
     select(name, screenName, body, postedTime, hotIssue, local) %>%
+    # Spread the rows by the "topic", "Probability", name (which is the topic number VX)
     gather("topic", "Probability", name) %>%
     filter(Probability < max & Probability > min) %>%
     select(-topic) %>%
     mutate(Probability = round(Probability, 5)) %>%
     arrange(desc(Probability))
 
+  # Create a DataTable from t
   DT::datatable(t, 
                 filter = 'top', 
                 extensions = 'Buttons',
-                options = list(pageLength = 8, 
-                               buttons = c('copy', 'csv', 'excel', 'pdf'),
-                               dom = 'Bfrtip'), 
+                options = list(
+                    # Options we discarded but may need later
+                    # dom = 'Bfrtip',
+                    # autoHeight = TRUE,
+                    # deferRender = TRUE,
+                    #scroller = TRUE
+                    # Initial number of rows displayed (-1 means all)
+                    pageLength = -1,
+                    # Menu for selecting how many rows to be displayed
+                    lengthMenu = c(15, 20, 50, 100, -1),
+                    # Exporting options
+                    buttons = c('copy', 'csv', 'excel'),
+                    scrollY = 700
+                    ),
                 rownames = FALSE)
 })
 ```
