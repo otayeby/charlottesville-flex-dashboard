@@ -58,19 +58,20 @@ Row {.tabset .tabset-fade}
 ```{r}
 # Call renderPlotly
 renderPlotly({
+  # Get the column name of the probabilities displayed, which is topic number VX, and X is an int
   name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
   # Construct the ggplot for that topic using Gaussian as the kernel density
   g <- df %>%
     # Select the columns VX (X: topic number) and hotIssue from the df
     select(name, hotIssue) %>%
-    # Spread the selected the rows by the "topic", "Probability", name (which is the topic number VX)
+    # Collapse the selected rows so that the key is the "topic" which would be the name (which is the topic number VX), and the "Probability" is the value
     gather("topic", "Probability", name) %>%
     # Create a gglplot where the aesthetic is the Probability and the color is the hotIssue
     ggplot(aes(x = Probability, color = hotIssue)) +
-    # Make hte ggplot a gaussian kernel density function with an adjustment
+    # Make the ggplot a gaussian kernel density function with an adjustment
     geom_density(kernel = "gaussian", adjust = input$adjust) +
     theme(legend.position = "none") +
-    xlim(input$xaxis[1],input$xaxis[2]) +
+    xlim(input$xaxis[1], input$xaxis[2]) +
     ylim(0,input$yaxis)
   # Use ggplotly to plot the ggplot
   ggplotly(g, tooltip = c("y","x","colour"))
@@ -89,14 +90,19 @@ DT::renderDataTable({
   min <- event.data$`xaxis.range[0]`
   max <- event.data$`xaxis.range[1]`
 
-  # Get the column name of the probabilities displayed
+  # Get the column name of the probabilities displayed, which is topic number VX, and X is an int
   name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
   
-  # Pass the df to a pipeline
+  # Add these constants as columns to be present in the download, however, they will be invisible in the DT, using the columnDefs option
+  df['topic_words'] <- rep(input$topicNum, length(dim(df)[1]))
+  df['min'] <- rep(min, length(dim(df)[1]))
+  df['max'] <- rep(max, length(dim(df)[1]))
+  
+  # Pass the df to a pipeline that prepares the table
   t <- df %>%
-    # Select the columns name (which is actually VX), screenName, body, postedTime, hostIssue, local
-    select(name, screenName, body, postedTime, hotIssue, local) %>%
-    # Spread the rows by the "topic", "Probability", name (which is the topic number VX)
+    # Select the columns: name (which is actually VX), screenName, body, postedTime, hostIssue, local
+    select(name, topic_words, min, max, screenName, body, postedTime, hotIssue, local) %>%
+    # Collapse the rows so that the key is "topic" to be name (which is the topic number VX), and the "Probability" is the value
     gather("topic", "Probability", name) %>%
     filter(Probability < max & Probability > min) %>%
     select(-topic) %>%
@@ -108,18 +114,21 @@ DT::renderDataTable({
                 filter = 'top', 
                 extensions = 'Buttons',
                 options = list(
-                    # Options we discarded but may need later
-                    # dom = 'Bfrtip',
-                    # autoHeight = TRUE,
-                    # deferRender = TRUE,
-                    #scroller = TRUE
+                    # Scrolling option
+                    scroller = TRUE,
+                    scrollY = 700,
                     # Initial number of rows displayed (-1 means all)
                     pageLength = -1,
                     # Menu for selecting how many rows to be displayed
                     lengthMenu = c(15, 20, 50, 100, -1),
                     # Exporting options
+                    dom = 'Bfrtip',
                     buttons = c('copy', 'csv', 'excel'),
-                    scrollY = 700
+                    # Hide columns that we still want to download (the columns can be mentioned by numbers not names)
+                    columnDefs = list(list(visible=FALSE, targets=c(0, 1, 2)))
+                    ### Options we discarded but may need later
+                    # autoHeight = TRUE, # for adjusting the hieght automatically, but it didn't work
+                    # deferRender = TRUE, # for rendering on the fly, but seems not to have much effect
                     ),
                 rownames = FALSE)
 })
