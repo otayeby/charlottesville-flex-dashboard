@@ -89,15 +89,12 @@ DT::renderDataTable({
   # Set the max and min according to the event
   min <- event.data$`xaxis.range[0]`
   max <- event.data$`xaxis.range[1]`
-
   # Get the column name of the probabilities displayed, which is topic number VX, and X is an int
   name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
-  
   # Add these constants as columns to be present in the download, however, they will be invisible in the DT, using the columnDefs option
   df['topic_words'] <- rep(input$topicNum, length(dim(df)[1]))
   df['min'] <- rep(min, length(dim(df)[1]))
   df['max'] <- rep(max, length(dim(df)[1]))
-  
   # Pass the df to a pipeline that prepares the table
   t <- df %>%
     # Select the columns: name (which is actually VX), screenName, body, postedTime, hostIssue, local
@@ -108,7 +105,6 @@ DT::renderDataTable({
     select(-topic) %>%
     mutate(Probability = round(Probability, 5)) %>%
     arrange(desc(Probability))
-
   # Create a DataTable from t
   DT::datatable(t, 
                 filter = 'top', 
