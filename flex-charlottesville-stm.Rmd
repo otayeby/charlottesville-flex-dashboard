@@ -23,6 +23,7 @@ library(igraph)
 load(file = "data/tweet_topic_df.RData")
 load(file = "data/topicDF.RData")
 load(file = "data/network.RData")
+load(file = "data/dfmNoHashtags.RData")
 
 # Convert IDs to numeric
 df$id <- as.numeric(df$id)
@@ -36,13 +37,16 @@ Inputs {.sidebar}
 selectInput("topicNum", label = "1st Topic", choices = topicDF$Prob)
 # Set input for the x-range
 sliderInput("xaxis", label = "X Range",
-            min = 0, max = 1, value = c(0, 0.2), step = 0.05)
+            min = 0, max = 1, value = c(0, 1), step = 0.05)
 # Set input for the y-range
 sliderInput("yaxis", label = "Y Range",
-            min = 0, max = 150, value = 100, step = 0.05)
+            min = 0, max = 2000, value = 100, step = 5)
 # Set input for the adjustment
 sliderInput("adjust", label = "Adjustment",
-            min = 0, max = 3, value = 1, step = 0.1)
+            min = 0.01, max = 3, value = 0.5, step = 0.1)
+# Set input for the cosine similarity threshold
+sliderInput("cosine_thresh", label = "Cosine similarity threshold",
+            min = 0.7, max = 1, value = 0.8, step = 0.05)
 # Set input for the bin width
 #sliderInput("histogramBin", label = "Histogram Bin",
 #            min = 0, max = 0.1, value = 0.01, step = 0.001)
@@ -85,7 +89,7 @@ renderPlotly({
 # Call renderDataTable from DT library
 DT::renderDataTable({
   # Set the event listener
-  event.data <- event_data("plotly_relayout")
+  event.data <- event_data('plotly_relayout')
   # Set the max and min according to the event
   min <- event.data$`xaxis.range[0]`
   max <- event.data$`xaxis.range[1]`
@@ -100,14 +104,14 @@ DT::renderDataTable({
     # Select the columns: name (which is actually VX), screenName, body, postedTime, hostIssue, local
     select(name, topic_words, min, max, screenName, body, postedTime, hotIssue, local) %>%
     # Collapse the rows so that the key is "topic" to be name (which is the topic number VX), and the "Probability" is the value
-    gather("topic", "Probability", name) %>%
+    gather('topic', 'Probability', name) %>%
     filter(Probability < max & Probability > min) %>%
     select(-topic) %>%
     mutate(Probability = round(Probability, 5)) %>%
     arrange(desc(Probability))
   # Create a DataTable from t
-  DT::datatable(t, 
-                filter = 'top', 
+  DT::datatable(t,
+                filter = 'top',
                 extensions = 'Buttons',
                 options = list(
                     # Scrolling option
@@ -125,6 +129,91 @@ DT::renderDataTable({
                     ### Options we discarded but may need later
                     # autoHeight = TRUE, # for adjusting the hieght automatically, but it didn't work
                     # deferRender = TRUE, # for rendering on the fly, but seems not to have much effect
+                    ),
+                rownames = FALSE)
+})
+```
+
+### Cosine similarity
+
+```{r}
+#https://plot.ly/r/shiny-coupled-events/
+# Call renderDataTable from DT library
+DT::renderDataTable({
+  # Set the event listener
+  event.data <- event_data('plotly_relayout')
+  # Set the max and min according to the event
+  min <- event.data$`xaxis.range[0]`
+  max <- event.data$`xaxis.range[1]`
+  # Get the column name of the probabilities displayed, which is topic number VX, and X is an int
+  name <- topicDF$topicNum[topicDF$Prob == input$topicNum]
+  # Add these constants as columns to be present in the download, however, they will be invisible in the DT, using the columnDefs option
+  df['topic_words'] <- rep(input$topicNum, length(dim(df)[1]))
+  df['min'] <- rep(min, length(dim(df)[1]))
+  df['max'] <- rep(max, length(dim(df)[1]))
+  # Pass the df to a pipeline that prepares the table
+  t <- df %>%
+    # Select the columns: name (which is actually VX), screenName, body, postedTime, hostIssue, local
+    select(id, name, topic_words, min, max, screenName, body, postedTime, hotIssue, local) %>%
+    # Collapse the rows so that the key is "topic" to be name (which is the topic number VX), and the "Probability" is the value
+    gather('topic', 'Probability', name) %>%
+    filter(Probability < max & Probability > min) %>%
+    select(-topic) %>%
+    mutate(Probability = round(Probability, 5)) %>%
+    arrange(desc(Probability))
+
+# name <- 'V1'
+# min_val <- 0.1
+# max_val <- 0.15
+# t <- df %>%
+# select(id, name, screenName, body, postedTime, hotIssue, local) %>%
+# gather('topic', 'Probability', name) %>%
+# filter(Probability < max_val & Probability > min_val) %>%
+# select(-topic) %>%
+# mutate(Probability = round(Probability, 5)) %>%
+# arrange(desc(Probability))
+
+  # Selected Tweet IDs
+  selected_ids <- t$id
+  # Take the subset of the Document-Frequency matrix that has the selected IDs
+  subset_dfmNoHashtags <- subset(dfmNoHashtags, rownames(dfmNoHashtags) %in% selected_ids)
+  # Get the cosine similarity
+  cosine_sim <- textstat_simil(subset_dfmNoHashtags, method = 'cosine')
+  # Convert to a matrix
+  cosine_sim_mat <- as.matrix(cosine_sim)
+  # Replace the diagonal (which must be 1's) with NA
+  diag(cosine_sim_mat) = NA
+  # Convert to a DataFrame
+  cosine_sim_df <- as.data.frame(cosine_sim_mat)
+  # Get the max for each row
+  cosine_sim_df[, "max"] <- apply(cosine_sim_df, 1, max, na.rm=TRUE)
+  # Take the subset of the cosine similarity with max above the similarity threshold (0.7)
+  cosine_sim_subset <- subset(cosine_sim_df, max > input$cosine_thresh)
+  # Get the row names which are the IDs of the tweets with high similarity
+  similar_ids <- as.numeric(row.names(cosine_sim_subset))
+  # Select the rows in t which have the similar_ids
+  similar_t <- subset(t, id %in% similar_ids)
+
+  # Create a DataTable from t
+  DT::datatable(similar_t,
+                filter = 'top',
+                extensions = 'Buttons',
+                options = list(
+                    # Scrolling option
+                    scroller = TRUE,
+                    scrollY = 700,
+                    # Initial number of rows displayed (-1 means all)
+                    pageLength = -1,
+                    # Menu for selecting how many rows to be displayed
+                    lengthMenu = c(15, 20, 50, 100, -1),
+                    # Exporting options
+                    dom = 'Bfrtip',
+                    buttons = c('copy', 'csv', 'excel'),
+                    # Hide columns that we still want to download (the columns can be mentioned by numbers not names)
+                    columnDefs = list(list(visible=FALSE, targets=c(0, 1, 2, 3))),
+                    ### Options we discarded but may need later
+                    # autoHeight = TRUE, # for adjusting the hieght automatically, but it didn't work
+                    deferRender = TRUE # for rendering on the fly, but seems not to have much effect
                     ),
                 rownames = FALSE)
 })
