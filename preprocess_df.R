@@ -1,9 +1,16 @@
+# Start measuring time
+start_time <- Sys.time()
+
 #Load the libraries needed
 library(tidyverse); library(stm)
 
 # Load the input files: ctmFitNoHashtagsHotIssueLocal.RData (has the topic model) and allDocs1.RData (has the original tweets and other info)
-load(file = "ctmFitNoHashtagsHotIssueLocal.RData")
-load("allDocs1.RData")
+#load(file = "ctmFitNoHashtagsHotIssueLocal.RData")
+#load("allDocs1.RData")
+
+loc <- getwd()
+load(paste(loc, '/data/ctmFitNoHashtagsHotIssueLocal.RData', sep = ''))
+#load(paste(loc, '/data/allDocs1.RData', sep = ''))
 
 # Get number of topics
 n <- dim(ctmFitNoHashtags40$theta)[1]
@@ -37,17 +44,18 @@ names(tweetInfo) <- c("id", "screenName", "body", "postedTime")
 df <- merge(tweetInfo, theta, by="id")
 
 # Get network
+library(igraph)
 network <- topicCorr(ctmFitNoHashtags40, cutoff = .01)
 # for network plot
 links2 <- as.matrix(network$posadj)
 net2 <- graph_from_adjacency_matrix(links2, mode = "undirected") %>%
-  simplify(remove.multiple = F, remove.loops = T) 
+  simplify(remove.multiple = F, remove.loops = T)
 
 links <- as_data_frame(net2, what="edges")
 nodes <- as_data_frame(net2, what="vertices")
 
 #visNetwork edits
-nodes$shape <- "dot"  
+nodes$shape <- "dot"
 nodes$shadow <- TRUE # Nodes will drop shadow
 nodes$label <- topicDF$Prob # Node label
 nodes$title <- topicDF$Frex # Node label
@@ -58,6 +66,17 @@ nodes$id <- topicDF$topicNum
 net <- list(nodes, links)
 
 # Save the dataframe
-save(df, file = "tweet_topic_df.RData")
-save(topicDF, file = "topicDF.RData")
-save(net, file = "network.RData")
+save(df, file = "data/tweet_topic_df.RData")
+save(topicDF, file = "data/topicDF.RData")
+save(net, file = "data/network.RData")
+save(dfmNoHashtags, file = "data/dfmNoHashtags.RData")
+
+# End measuring time and print the time taken
+end_time <- Sys.time()
+print(end_time - start_time)
+# K = 10
+# 1/3: 7.662826 secs
+# 1/2: 12.90461 secs
+# 1/1: 25.20941 secs
+# K = 40
+# 1/1: 37.07303 secs
