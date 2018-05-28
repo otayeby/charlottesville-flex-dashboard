@@ -12,7 +12,7 @@ loc <- getwd()
 load(paste(loc, '/data/ctmFitNoHashtagsHotIssueLocal.RData', sep = ''))
 #load(paste(loc, '/data/allDocs1.RData', sep = ''))
 
-# Get number of topics
+# Get number of topics and size of vocab
 n <- dim(ctmFitNoHashtags40$theta)[1]
 k <- dim(ctmFitNoHashtags40$theta)[2]
 
@@ -34,11 +34,13 @@ theta <- as.tibble(ctmFitNoHashtags40$theta) %>%
          local = ifelse(out$meta$local == 1L, "Local", "Non-Local"))
 
 # Save the tweetIds and body from the allDocs in a separate variable
-tweetInfo <- allDocs1[c("tweetId", "screenName", "body", "postedTime")]
+# tweetInfo <- allDocs1[c("tweetId", "screenName", "body", "postedTime")]
+tweetInfo <- allDocs1[c("tweetId", "screenName", "body", "postedTime", "generator", "finalURL", "subdomain", "domain", "suffix")]
 tweetInfo$tweetId <- as.character(tweetInfo$tweetId)
 
 # Rename the tweetId column to id, so it can match the model_theta id column when merging
-names(tweetInfo) <- c("id", "screenName", "body", "postedTime")
+# names(tweetInfo) <- c("id", "screenName", "body", "postedTime")
+names(tweetInfo) <- c("id", "screenName", "body", "postedTime", "generator", "finalURL", "subdomain", "domain", "suffix")
 
 # Merge the model_theta and tweet_id_info by id and save it to model_theta
 df <- merge(tweetInfo, theta, by="id")

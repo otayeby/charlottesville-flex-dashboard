@@ -102,7 +102,7 @@ DT::renderDataTable({
   # Pass the df to a pipeline that prepares the table
   t <- df %>%
     # Select the columns: name (which is actually VX), screenName, body, postedTime, hostIssue, local
-    select(name, topic_words, min, max, screenName, body, postedTime, hotIssue, local) %>%
+    select(name, topic_words, min, max, screenName, body, postedTime, hotIssue, local, generator, subdomain, domain, suffix) %>%
     # Collapse the rows so that the key is "topic" to be name (which is the topic number VX), and the "Probability" is the value
     gather('topic', 'Probability', name) %>%
     filter(Probability < max & Probability > min) %>%
@@ -129,6 +129,8 @@ DT::renderDataTable({
                     ### Options we discarded but may need later
                     # autoHeight = TRUE, # for adjusting the hieght automatically, but it didn't work
                     # deferRender = TRUE, # for rendering on the fly, but seems not to have much effect
+                    # Automatic width
+                    # autoWidth = TRUE
                     ),
                 rownames = FALSE)
 })
@@ -154,25 +156,13 @@ DT::renderDataTable({
   # Pass the df to a pipeline that prepares the table
   t <- df %>%
     # Select the columns: name (which is actually VX), screenName, body, postedTime, hostIssue, local
-    select(id, name, topic_words, min, max, screenName, body, postedTime, hotIssue, local) %>%
+    select(id, name, topic_words, min, max, screenName, body, postedTime, hotIssue, local, generator, subdomain, domain, suffix) %>%
     # Collapse the rows so that the key is "topic" to be name (which is the topic number VX), and the "Probability" is the value
     gather('topic', 'Probability', name) %>%
     filter(Probability < max & Probability > min) %>%
     select(-topic) %>%
     mutate(Probability = round(Probability, 5)) %>%
     arrange(desc(Probability))
-
-# name <- 'V1'
-# min_val <- 0.1
-# max_val <- 0.15
-# t <- df %>%
-# select(id, name, screenName, body, postedTime, hotIssue, local) %>%
-# gather('topic', 'Probability', name) %>%
-# filter(Probability < max_val & Probability > min_val) %>%
-# select(-topic) %>%
-# mutate(Probability = round(Probability, 5)) %>%
-# arrange(desc(Probability))
-
   # Selected Tweet IDs
   selected_ids <- t$id
   # Take the subset of the Document-Frequency matrix that has the selected IDs
@@ -214,6 +204,8 @@ DT::renderDataTable({
                     ### Options we discarded but may need later
                     # autoHeight = TRUE, # for adjusting the hieght automatically, but it didn't work
                     deferRender = TRUE # for rendering on the fly, but seems not to have much effect
+                    # Automatic width
+                    # autoWidth = TRUE,
                     ),
                 rownames = FALSE)
 })
